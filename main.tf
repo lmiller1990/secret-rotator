@@ -2,9 +2,14 @@ provider "aws" {
   region = "ap-southeast-2"  # Adjust as needed
 }
 
+variable "environment" {
+  description = "The environment (uat, staging, prod, demo)"
+  type        = string
+}
+
 # Create an IAM role for the Lambda function
 resource "aws_iam_role" "lambda_role" {
-  name = "lambda_secret_rotator_role"
+  name = "lambda_secret_rotator_role_${var.environment}"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -23,7 +28,7 @@ resource "aws_iam_role" "lambda_role" {
 
 # Attach policies to the IAM role
 resource "aws_iam_policy_attachment" "lambda_ssm_policy" {
-  name       = "lambda_ssm_policy_attachment"
+  name       = "lambda_ssm_policy_attachment_${var.environment}"
   roles      = [aws_iam_role.lambda_role.name]
   policy_arn = aws_iam_policy.lambda_ssm_policy.arn 
 }
@@ -53,7 +58,7 @@ resource "aws_iam_policy" "lambda_ssm_policy" {
 
 # Create SSM Parameter Store parameter
 resource "aws_ssm_parameter" "secret_parameter" {
-  name        = "gitlab_bot_password"
+  name        = "gitlab_bot_password-${var.environment}"
   type        = "SecureString"
   value       = "topsecret"
   tier        = "Standard"
@@ -61,7 +66,7 @@ resource "aws_ssm_parameter" "secret_parameter" {
 
 # Create the Lambda function
 resource "aws_lambda_function" "secret_rotator" {
-  function_name = "SecretRotator"
+  function_name = "SecretRotator_${var.environment}"
   role          = aws_iam_role.lambda_role.arn
   handler       = "rotate.lambda.handler"
   runtime       = "python3.12"
@@ -74,15 +79,17 @@ resource "aws_lambda_function" "secret_rotator" {
   environment {
     variables = {
       SSM_PARAMETER_NAME = aws_ssm_parameter.secret_parameter.name
+      AUTH_API_URL = "${var.auth_api_url}"
+      AUTH_API_USERNAME =  "${var.auth_api_username}"
     }
   }
 }
 
-# Create EventBridge rule to trigger Lambda every 1 min
+# Create EventBridge rule to trigger Lambda every 24 hours
 resource "aws_cloudwatch_event_rule" "schedule" {
   name        = "SecretRotationSchedule"
   description = "Trigger Lambda every 1 min"
-  schedule_expression = "rate(1 minute)"
+  schedule_expression = "rate(24 hours)"
 }
 
 # Create EventBridge target to invoke the Lambda function

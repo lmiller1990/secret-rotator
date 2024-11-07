@@ -20,9 +20,12 @@ Build
 ./lambda.sh
 ```
 
-And deploy:
+And deploy (make sure to update `*.tfvars` first):
 
 ```sh
 terraform init
-terraform apply
+terraform apply -var-file="dev.tfvars"      # Development
+terraform apply -var-file="staging.tfvars"  # Staging
+terraform apply -var-file="demo.tfvars"     # Demo
+terraform apply -var-file="prod.tfvars"     # Production
 ```
